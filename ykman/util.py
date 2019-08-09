@@ -40,6 +40,7 @@ from base64 import b32decode
 from binascii import b2a_hex, a2b_hex
 from OpenSSL import crypto
 from .scancodes import KEYBOARD_LAYOUT
+from . import ykman_rs
 
 
 logger = logging.getLogger(__name__)
@@ -552,8 +553,7 @@ def get_leaf_certificates(certs):
     return leafs
 
 
-def is_pem(data):
-    return PEM_IDENTIFIER in data if data else False
+is_pem = ykman_rs.is_pem
 
 
 def is_pkcs12(data):
