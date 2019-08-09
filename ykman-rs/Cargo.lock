@@ -212,6 +212,7 @@ name = "ykman-rs"
 version = "0.1.0"
 dependencies = [
  "pyo3 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [metadata]
