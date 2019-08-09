@@ -1,0 +1,7 @@
+[package]
+name = "ykman-rs"
+version = "0.1.0"
+authors = ["Emil Lundberg <emil@yubico.com>"]
+edition = "2018"
+
+[dependencies]
