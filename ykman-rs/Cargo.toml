@@ -4,4 +4,8 @@ version = "0.1.0"
 authors = ["Emil Lundberg <emil@yubico.com>"]
 edition = "2018"
 
+[lib]
+name = "ykman_rs"
+crate-type = ["cdylib"]
+
 [dependencies]
