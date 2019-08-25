@@ -381,8 +381,7 @@ def ensure_not_cve201715361_vulnerable_firmware_version(f_version):
         raise Cve201715361VulnerableError(f_version)
 
 
-def is_cve201715361_vulnerable_firmware_version(f_version):
-    return (4, 2, 0) <= f_version < (4, 3, 5)
+is_cve201715361_vulnerable_firmware_version = ykman_rs.is_cve201715361_vulnerable_firmware_version
 
 
 def modhex_decode(value):
