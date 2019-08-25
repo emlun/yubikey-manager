@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::convert::TryFrom;
 
 use pyo3::prelude::Python;
@@ -53,6 +54,12 @@ impl TryFrom<&str> for Modhex {
     }
 }
 
+impl Borrow<str> for Modhex {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
 impl IntoPyObject for Modhex {
     fn into_object(self, py: Python) -> PyObject {
         PyString::new(py, self.as_str()).into_object(py)
@@ -93,6 +100,7 @@ fn byte_to_modhex_digits(i: &u8) -> (u8, u8) {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Borrow;
     use std::convert::TryFrom;
 
     use quickcheck_macros::quickcheck;
@@ -129,6 +137,15 @@ mod tests {
                 .as_slice()
         );
         Ok(())
+    }
+
+    #[test]
+    fn modhex_can_be_borrowed_as_str_slice() {
+        let mh = Modhex::from(
+            b"\x69\xb6\x48\x1c\x8b\xab\xa2\xb6\x0e\x8f\x22\x17\x9b\x58\xcd\x56" as &[u8],
+        );
+        let borrow: &str = mh.borrow();
+        assert_eq!(mh.as_str(), borrow);
     }
 
     #[quickcheck]
