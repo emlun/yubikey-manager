@@ -123,4 +123,9 @@ mod tests {
     fn encode_then_decode_is_identity(data: Vec<u8>) -> bool {
         data == Modhex::from_bytes(data.as_slice()).as_bytes()
     }
+
+    #[quickcheck]
+    fn modhex_length_is_twice_byte_length(data: Vec<u8>) -> bool {
+        2 * data.len() == Modhex::from_bytes(data.as_slice()).as_string().len()
+    }
 }
