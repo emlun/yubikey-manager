@@ -239,6 +239,42 @@ _tlv_parse_tag = ykman_rs.tlv_parse_tag
 _tlv_parse_length = ykman_rs.tlv_parse_length
 
 
+def _prepare_tlv_data(*args):
+    if len(args) == 1:
+        data = args[0]
+        if isinstance(data, int):  # Called with tag only, blank value
+            tag = data
+            value = b''
+        else:  # Called with binary TLV data
+            tag, tag_ln = _tlv_parse_tag(data)
+            ln, ln_ln = _tlv_parse_length(data, tag_ln)
+            offs = tag_ln + ln_ln
+            value = data[offs:offs+ln]
+    elif len(args) == 2:  # Called with tag and value.
+        (tag, value) = args
+    else:
+        raise TypeError()
+
+    data = bytearray([])
+    if tag <= 0xff:
+        data.append(tag)
+    else:
+        tag_1 = tag >> 8
+        if tag_1 > 0xff or tag_1 & 0x1f != 0x1f:
+            raise ValueError('Unsupported tag value')
+        tag_2 = tag & 0xff
+        data.extend([tag_1, tag_2])
+    length = len(value)
+    if length < 0x80:
+        data.append(length)
+    elif length < 0xff:
+        data.extend([0x81, length])
+    else:
+        data.extend([0x82, length >> 8, length & 0xff])
+    data += value
+    return data
+
+
 class Tlv(bytes):
 
     @property
@@ -265,39 +301,11 @@ class Tlv(bytes):
         )
 
     def __new__(cls, *args):
-        if len(args) == 1:
-            data = args[0]
-            if isinstance(data, int):  # Called with tag only, blank value
-                tag = data
-                value = b''
-            else:  # Called with binary TLV data
-                tag, tag_ln = _tlv_parse_tag(data)
-                ln, ln_ln = _tlv_parse_length(data, tag_ln)
-                offs = tag_ln + ln_ln
-                value = data[offs:offs+ln]
-        elif len(args) == 2:  # Called with tag and value.
-            (tag, value) = args
-        else:
+        try:
+            data = _prepare_tlv_data(*args)
+        except TypeError:
             raise TypeError('{}() takes at most 2 arguments ({} given)'.format(
                 cls, len(args)))
-
-        data = bytearray([])
-        if tag <= 0xff:
-            data.append(tag)
-        else:
-            tag_1 = tag >> 8
-            if tag_1 > 0xff or tag_1 & 0x1f != 0x1f:
-                raise ValueError('Unsupported tag value')
-            tag_2 = tag & 0xff
-            data.extend([tag_1, tag_2])
-        length = len(value)
-        if length < 0x80:
-            data.append(length)
-        elif length < 0xff:
-            data.extend([0x81, length])
-        else:
-            data.extend([0x82, length >> 8, length & 0xff])
-        data += value
 
         return super(Tlv, cls).__new__(cls, bytes(data))
 
