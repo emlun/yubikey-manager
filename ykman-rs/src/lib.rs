@@ -1,5 +1,7 @@
 mod modhex;
 
+use std::convert::TryFrom;
+
 use regex::bytes::Regex;
 
 use pyo3::exceptions::TypeError;
@@ -65,7 +67,7 @@ fn ykman_rs(_py: Python, m: &PyModule) -> PyResult<()> {
 
     #[pyfn(m, "modhex_decode")]
     fn py_modhex_decode<'p>(py: Python<'p>, data: &PyString) -> PyResult<&'p PyBytes> {
-        Modhex::from_modhex(data.to_string()?.as_ref())
+        Modhex::try_from(data.to_string()?.as_ref())
             .map(|mh| PyBytes::new(py, mh.as_bytes().as_slice()))
             .or_else(|_| Err(ValueError::py_err(format!("Invalid modhex: {:?}", data))))
     }

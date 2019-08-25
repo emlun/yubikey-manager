@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use pyo3::prelude::Python;
 use pyo3::types::PyString;
 use pyo3::IntoPyObject;
@@ -9,16 +11,6 @@ pub struct Modhex {
     value: String,
 }
 impl Modhex {
-    pub fn from_modhex(value: &str) -> Result<Modhex, ()> {
-        if value.bytes().all(|c| MODHEX_DIGITS.contains(&c)) {
-            Ok(Modhex {
-                value: value.to_string(),
-            })
-        } else {
-            Err(())
-        }
-    }
-
     pub fn as_bytes(&self) -> Vec<u8> {
         let msds = self.value.chars().step_by(2);
         let lsds = self.value.chars().skip(1).step_by(2);
@@ -43,6 +35,20 @@ impl From<&[u8]> for Modhex {
                     result
                 },
             ),
+        }
+    }
+}
+
+impl TryFrom<&str> for Modhex {
+    type Error = ();
+
+    fn try_from(value: &str) -> Result<Modhex, Self::Error> {
+        if value.bytes().all(|c| MODHEX_DIGITS.contains(&c)) {
+            Ok(Modhex {
+                value: value.to_string(),
+            })
+        } else {
+            Err(())
         }
     }
 }
@@ -87,6 +93,8 @@ fn byte_to_modhex_digits(i: &u8) -> (u8, u8) {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
+
     use quickcheck_macros::quickcheck;
 
     use super::Modhex;
@@ -109,14 +117,14 @@ mod tests {
 
     #[test]
     fn modhex_decode_is_correct() -> Result<(), ()> {
-        assert_eq!(b"", &Modhex::from_modhex("")?.as_bytes().as_slice());
+        assert_eq!(b"", &Modhex::try_from("")?.as_bytes().as_slice());
         assert_eq!(
             b"\x2d\x34\x4e\x83",
-            Modhex::from_modhex("dteffuje")?.as_bytes().as_slice()
+            Modhex::try_from("dteffuje")?.as_bytes().as_slice()
         );
         assert_eq!(
             b"\x69\xb6\x48\x1c\x8b\xab\xa2\xb6\x0e\x8f\x22\x17\x9b\x58\xcd\x56",
-            Modhex::from_modhex("hknhfjbrjnlnldnhcujvddbikngjrtgh")?
+            Modhex::try_from("hknhfjbrjnlnldnhcujvddbikngjrtgh")?
                 .as_bytes()
                 .as_slice()
         );
