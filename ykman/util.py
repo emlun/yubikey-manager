@@ -255,6 +255,10 @@ def _prepare_tlv_data(*args):
     else:
         raise TypeError()
 
+    return _prepare_tlv_data_part2(tag, value)
+
+
+def _prepare_tlv_data_part2(tag, value):
     data = bytearray([])
     if tag <= 0xff:
         data.append(tag)
