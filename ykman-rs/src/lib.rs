@@ -78,5 +78,10 @@ fn ykman_rs(_py: Python, m: &PyModule) -> PyResult<()> {
         tlv::parse_tag(data.as_bytes(), offset.unwrap_or(0))
     }
 
+    #[pyfn(m, "tlv_parse_length")]
+    fn py_tlv_parse_length(_py: Python, data: &PyBytes, offset: Option<usize>) -> (u128, u8) {
+        tlv::parse_length(data.as_bytes(), offset.unwrap_or(0))
+    }
+
     Ok(())
 }

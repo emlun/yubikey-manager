@@ -236,17 +236,7 @@ class Mode(object):
 
 
 _tlv_parse_tag = ykman_rs.tlv_parse_tag
-
-
-def _tlv_parse_length(data, offs=0):
-    ln = six.indexbytes(data, offs)
-    offs += 1
-    if ln > 0x80:
-        n_bytes = ln - 0x80
-        ln = bytes2int(data[offs:offs + n_bytes])
-    else:
-        n_bytes = 0
-    return ln, n_bytes + 1
+_tlv_parse_length = ykman_rs.tlv_parse_length
 
 
 class Tlv(bytes):
