@@ -370,9 +370,6 @@ def bytes2int(data):
 
 
 _HEX = b'0123456789abcdef'
-_MODHEX = b'cbdefghijklnrtuv'
-_MODHEX_TO_HEX = dict((_MODHEX[i], _HEX[i:i+1]) for i in range(16))
-_HEX_TO_MODHEX = dict((_HEX[i], _MODHEX[i:i+1]) for i in range(16))
 DEFAULT_PW_CHAR_BLACKLIST = ['\t', '\n', ' ']
 
 
@@ -384,14 +381,8 @@ def ensure_not_cve201715361_vulnerable_firmware_version(f_version):
 is_cve201715361_vulnerable_firmware_version = ykman_rs.is_cve201715361_vulnerable_firmware_version
 
 
-def modhex_decode(value):
-    if isinstance(value, six.text_type):
-        value = value.encode('ascii')
-    return a2b_hex(b''.join(_MODHEX_TO_HEX[c] for c in value))
-
-
-def modhex_encode(value):
-    return b''.join(_HEX_TO_MODHEX[c] for c in b2a_hex(value)).decode('ascii')
+modhex_decode = ykman_rs.modhex_decode
+modhex_encode = ykman_rs.modhex_encode
 
 
 def generate_static_pw(
