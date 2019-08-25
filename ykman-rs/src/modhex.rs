@@ -9,19 +9,6 @@ pub struct Modhex {
     value: String,
 }
 impl Modhex {
-    pub fn from_bytes(value: &[u8]) -> Modhex {
-        Modhex {
-            value: value.iter().map(byte_to_modhex_digits).fold(
-                String::new(),
-                |mut result, (msd, lsd)| {
-                    result.push(msd as char);
-                    result.push(lsd as char);
-                    result
-                },
-            ),
-        }
-    }
-
     pub fn from_modhex(value: &str) -> Result<Modhex, ()> {
         if value.bytes().all(|c| MODHEX_DIGITS.contains(&c)) {
             Ok(Modhex {
@@ -42,6 +29,21 @@ impl Modhex {
 
     fn as_string(&self) -> &String {
         &self.value
+    }
+}
+
+impl From<&[u8]> for Modhex {
+    fn from(value: &[u8]) -> Modhex {
+        Modhex {
+            value: value.iter().map(byte_to_modhex_digits).fold(
+                String::new(),
+                |mut result, (msd, lsd)| {
+                    result.push(msd as char);
+                    result.push(lsd as char);
+                    result
+                },
+            ),
+        }
     }
 }
 
@@ -91,15 +93,17 @@ mod tests {
 
     #[test]
     fn modhex_encode_is_correct() {
-        assert_eq!("", Modhex::from_bytes(b"").as_string());
+        assert_eq!("", Modhex::from(b"" as &[u8]).as_string());
         assert_eq!(
             "dteffuje",
-            Modhex::from_bytes(b"\x2d\x34\x4e\x83").as_string()
+            Modhex::from(b"\x2d\x34\x4e\x83" as &[u8]).as_string()
         );
         assert_eq!(
             "hknhfjbrjnlnldnhcujvddbikngjrtgh",
-            Modhex::from_bytes(b"\x69\xb6\x48\x1c\x8b\xab\xa2\xb6\x0e\x8f\x22\x17\x9b\x58\xcd\x56")
-                .as_string()
+            Modhex::from(
+                b"\x69\xb6\x48\x1c\x8b\xab\xa2\xb6\x0e\x8f\x22\x17\x9b\x58\xcd\x56" as &[u8]
+            )
+            .as_string()
         );
     }
 
@@ -121,11 +125,11 @@ mod tests {
 
     #[quickcheck]
     fn encode_then_decode_is_identity(data: Vec<u8>) -> bool {
-        data == Modhex::from_bytes(data.as_slice()).as_bytes()
+        data == Modhex::from(data.as_slice()).as_bytes()
     }
 
     #[quickcheck]
     fn modhex_length_is_twice_byte_length(data: Vec<u8>) -> bool {
-        2 * data.len() == Modhex::from_bytes(data.as_slice()).as_string().len()
+        2 * data.len() == Modhex::from(data.as_slice()).as_string().len()
     }
 }

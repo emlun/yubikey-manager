@@ -60,7 +60,7 @@ fn ykman_rs(_py: Python, m: &PyModule) -> PyResult<()> {
 
     #[pyfn(m, "modhex_encode")]
     fn py_modhex_encode(_py: Python, data: &PyBytes) -> Modhex {
-        Modhex::from_bytes(data.as_bytes())
+        Modhex::from(data.as_bytes())
     }
 
     #[pyfn(m, "modhex_decode")]
