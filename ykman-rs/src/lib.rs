@@ -1,4 +1,5 @@
 mod modhex;
+mod tlv;
 
 use std::convert::TryFrom;
 
@@ -10,8 +11,10 @@ use pyo3::prelude::pymodule;
 use pyo3::prelude::PyModule;
 use pyo3::prelude::PyResult;
 use pyo3::prelude::Python;
+use pyo3::prelude::ToPyObject;
 use pyo3::types::PyAny;
 use pyo3::types::PyBytes;
+use pyo3::types::PyLong;
 use pyo3::types::PyString;
 use pyo3::types::PyTuple;
 
@@ -70,6 +73,11 @@ fn ykman_rs(_py: Python, m: &PyModule) -> PyResult<()> {
         Modhex::try_from(data.to_string()?.as_ref())
             .map(|mh| PyBytes::new(py, mh.as_bytes().as_slice()))
             .or_else(|_| Err(ValueError::py_err(format!("Invalid modhex: {:?}", data))))
+    }
+
+    #[pyfn(m, "tlv_parse_tag")]
+    fn py_tlv_parse_tag(_py: Python, data: &PyBytes, offset: Option<usize>) -> (u16, u8) {
+        tlv::parse_tag(data.as_bytes(), offset.unwrap_or(0))
     }
 
     Ok(())

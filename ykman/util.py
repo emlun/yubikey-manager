@@ -235,13 +235,7 @@ class Mode(object):
     __hash__ = None
 
 
-def _tlv_parse_tag(data, offs=0):
-    t = six.indexbytes(data, offs)
-    if t & 0x1f != 0x1f:
-        return t, 1
-    else:
-        t = t << 8 | six.indexbytes(data, offs+1)
-        return t, 2
+_tlv_parse_tag = ykman_rs.tlv_parse_tag
 
 
 def _tlv_parse_length(data, offs=0):
