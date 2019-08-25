@@ -85,6 +85,8 @@ fn byte_to_modhex_digits(i: &u8) -> (u8, u8) {
 
 #[cfg(test)]
 mod tests {
+    use quickcheck_macros::quickcheck;
+
     use super::Modhex;
 
     #[test]
@@ -117,4 +119,8 @@ mod tests {
         Ok(())
     }
 
+    #[quickcheck]
+    fn encode_then_decode_is_identity(data: Vec<u8>) -> bool {
+        data == Modhex::from_bytes(data.as_slice()).as_bytes()
+    }
 }
