@@ -19,7 +19,7 @@ impl Modhex {
             .collect()
     }
 
-    fn as_string(&self) -> &String {
+    fn as_str(&self) -> &str {
         &self.value
     }
 }
@@ -55,7 +55,7 @@ impl TryFrom<&str> for Modhex {
 
 impl IntoPyObject for Modhex {
     fn into_object(self, py: Python) -> PyObject {
-        PyString::new(py, self.as_string()).into_object(py)
+        PyString::new(py, self.as_str()).into_object(py)
     }
 }
 
@@ -101,17 +101,17 @@ mod tests {
 
     #[test]
     fn modhex_encode_is_correct() {
-        assert_eq!("", Modhex::from(b"" as &[u8]).as_string());
+        assert_eq!("", Modhex::from(b"" as &[u8]).as_str());
         assert_eq!(
             "dteffuje",
-            Modhex::from(b"\x2d\x34\x4e\x83" as &[u8]).as_string()
+            Modhex::from(b"\x2d\x34\x4e\x83" as &[u8]).as_str()
         );
         assert_eq!(
             "hknhfjbrjnlnldnhcujvddbikngjrtgh",
             Modhex::from(
                 b"\x69\xb6\x48\x1c\x8b\xab\xa2\xb6\x0e\x8f\x22\x17\x9b\x58\xcd\x56" as &[u8]
             )
-            .as_string()
+            .as_str()
         );
     }
 
@@ -138,6 +138,6 @@ mod tests {
 
     #[quickcheck]
     fn modhex_length_is_twice_byte_length(data: Vec<u8>) -> bool {
-        2 * data.len() == Modhex::from(data.as_slice()).as_string().len()
+        2 * data.len() == Modhex::from(data.as_slice()).as_str().len()
     }
 }
