@@ -3,40 +3,49 @@ use pyo3::types::PyString;
 use pyo3::IntoPyObject;
 use pyo3::PyObject;
 
-pub struct Modhex(String);
+pub struct Modhex {
+    value: String,
+}
 impl Modhex {
     pub fn from_bytes(value: &[u8]) -> Modhex {
-        Modhex(value.iter().map(byte_to_modhex_digits).fold(
-            String::new(),
-            |mut result, (msd, lsd)| {
-                result.push(msd);
-                result.push(lsd);
-                result
-            },
-        ))
+        Modhex {
+            value: value.iter().map(byte_to_modhex_digits).fold(
+                String::new(),
+                |mut result, (msd, lsd)| {
+                    result.push(msd);
+                    result.push(lsd);
+                    result
+                },
+            ),
+        }
     }
 
     pub fn from_modhex(value: &str) -> Result<Modhex, ()> {
-        for c in value.chars() {
-            if "cbdefghijklnrtuv".contains(c) == false {
-                return Err(());
-            }
+        if value.chars().all(|c| "cbdefghijklnrtuv".contains(c)) {
+            Ok(Modhex {
+                value: value.to_string(),
+            })
+        } else {
+            Err(())
         }
-        Ok(Modhex(value.to_string()))
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {
-        let msds = self.0.chars().step_by(2);
-        let lsds = self.0.chars().skip(1).step_by(2);
+        let msds = self.value.chars().step_by(2);
+        let lsds = self.value.chars().skip(1).step_by(2);
         msds.zip(lsds)
             .map(|(msd, lsd)| modhex_digit_to_byte(msd) * 16 + modhex_digit_to_byte(lsd))
             .collect()
+    }
+
+    fn as_string(&self) -> &String {
+        &self.value
     }
 }
 
 impl IntoPyObject for Modhex {
     fn into_object(self, py: Python) -> PyObject {
-        PyString::new(py, &self.0).into_object(py)
+        PyString::new(py, self.as_string()).into_object(py)
     }
 }
 
