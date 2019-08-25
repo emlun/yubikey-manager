@@ -3,6 +3,8 @@ use pyo3::types::PyString;
 use pyo3::IntoPyObject;
 use pyo3::PyObject;
 
+const MODHEX_DIGITS: &[u8] = b"cbdefghijklnrtuv";
+
 pub struct Modhex {
     value: String,
 }
@@ -12,8 +14,8 @@ impl Modhex {
             value: value.iter().map(byte_to_modhex_digits).fold(
                 String::new(),
                 |mut result, (msd, lsd)| {
-                    result.push(msd);
-                    result.push(lsd);
+                    result.push(msd as char);
+                    result.push(lsd as char);
                     result
                 },
             ),
@@ -21,7 +23,7 @@ impl Modhex {
     }
 
     pub fn from_modhex(value: &str) -> Result<Modhex, ()> {
-        if value.chars().all(|c| "cbdefghijklnrtuv".contains(c)) {
+        if value.bytes().all(|c| MODHEX_DIGITS.contains(&c)) {
             Ok(Modhex {
                 value: value.to_string(),
             })
@@ -71,29 +73,11 @@ fn modhex_digit_to_byte(digit: char) -> u8 {
     }
 }
 
-fn nibble_to_modhex_digit(n: u8) -> char {
-    match n {
-        0 => 'c',
-        1 => 'b',
-        2 => 'd',
-        3 => 'e',
-        4 => 'f',
-        5 => 'g',
-        6 => 'h',
-        7 => 'i',
-        8 => 'j',
-        9 => 'k',
-        10 => 'l',
-        11 => 'n',
-        12 => 'r',
-        13 => 't',
-        14 => 'u',
-        15 => 'v',
-        _ => panic!(format!("Out of modhex digit range: {}", n)),
-    }
+fn nibble_to_modhex_digit(n: u8) -> u8 {
+    MODHEX_DIGITS[n as usize]
 }
 
-fn byte_to_modhex_digits(i: &u8) -> (char, char) {
+fn byte_to_modhex_digits(i: &u8) -> (u8, u8) {
     let msb = i / 16;
     let lsb = i % 16;
     (nibble_to_modhex_digit(msb), nibble_to_modhex_digit(lsb))
