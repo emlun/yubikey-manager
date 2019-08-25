@@ -101,8 +101,36 @@ fn byte_to_modhex_digits(i: &u8) -> (char, char) {
 
 #[cfg(test)]
 mod tests {
+    use super::Modhex;
+
     #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
+    fn modhex_encode_is_correct() {
+        assert_eq!("", Modhex::from_bytes(b"").as_string());
+        assert_eq!(
+            "dteffuje",
+            Modhex::from_bytes(b"\x2d\x34\x4e\x83").as_string()
+        );
+        assert_eq!(
+            "hknhfjbrjnlnldnhcujvddbikngjrtgh",
+            Modhex::from_bytes(b"\x69\xb6\x48\x1c\x8b\xab\xa2\xb6\x0e\x8f\x22\x17\x9b\x58\xcd\x56")
+                .as_string()
+        );
     }
+
+    #[test]
+    fn modhex_decode_is_correct() -> Result<(), ()> {
+        assert_eq!(b"", &Modhex::from_modhex("")?.as_bytes().as_slice());
+        assert_eq!(
+            b"\x2d\x34\x4e\x83",
+            Modhex::from_modhex("dteffuje")?.as_bytes().as_slice()
+        );
+        assert_eq!(
+            b"\x69\xb6\x48\x1c\x8b\xab\xa2\xb6\x0e\x8f\x22\x17\x9b\x58\xcd\x56",
+            Modhex::from_modhex("hknhfjbrjnlnldnhcujvddbikngjrtgh")?
+                .as_bytes()
+                .as_slice()
+        );
+        Ok(())
+    }
+
 }
