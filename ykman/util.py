@@ -239,25 +239,6 @@ _tlv_parse_tag = ykman_rs.tlv_parse_tag
 _tlv_parse_length = ykman_rs.tlv_parse_length
 
 
-def _prepare_tlv_data(*args):
-    if len(args) == 1:
-        data = args[0]
-        if isinstance(data, int):  # Called with tag only, blank value
-            tag = data
-            value = b''
-        else:  # Called with binary TLV data
-            tag, tag_ln = _tlv_parse_tag(data)
-            ln, ln_ln = _tlv_parse_length(data, tag_ln)
-            offs = tag_ln + ln_ln
-            value = data[offs:offs+ln]
-    elif len(args) == 2:  # Called with tag and value.
-        (tag, value) = args
-    else:
-        raise TypeError()
-
-    return ykman_rs.tlv_prepare_tlv_data_part2(tag, value)
-
-
 class Tlv(bytes):
 
     @property
@@ -285,7 +266,7 @@ class Tlv(bytes):
 
     def __new__(cls, *args):
         try:
-            data = _prepare_tlv_data(*args)
+            data = ykman_rs.tlv_prepare_tlv_data(*args)
         except TypeError:
             raise TypeError('{}() takes at most 2 arguments ({} given)'.format(
                 cls, len(args)))
