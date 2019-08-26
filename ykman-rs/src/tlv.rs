@@ -1,13 +1,5 @@
 use std::convert::TryInto;
 
-use pyo3::exceptions::ValueError;
-use pyo3::prelude::PyResult;
-use pyo3::prelude::Python;
-use pyo3::types::PyAny;
-use pyo3::types::PyBytes;
-use pyo3::types::PyLong;
-use pyo3::ToPyObject;
-
 fn add_u128_leading_zeroes(bytes: &[u8], len: usize) -> [u8; 16] {
     let mut padded: [u8; 16] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     for i in 0..len {
@@ -43,46 +35,6 @@ pub fn parse_length(data: &[u8], offset: usize) -> (u128, usize) {
     } else {
         (ln.into(), 1)
     }
-}
-
-pub fn prepare_tlv_data(
-    py: Python,
-    tag_or_data: &PyAny,
-    data: Option<&PyBytes>,
-) -> PyResult<Vec<u8>> {
-    let tag: u16;
-    let value: &[u8];
-
-    match data {
-        None => {
-            if let Ok(data) = tag_or_data.downcast_ref::<PyLong>() {
-                // Called with tag only, blank value
-                tag = data.to_object(py).extract(py)?;
-                value = b"";
-            } else if let Ok(data) = tag_or_data.downcast_ref::<PyBytes>() {
-                // Called with binary TLV data
-                let (_tag, tag_ln) = parse_tag(data.as_bytes(), 0);
-                tag = _tag;
-                let (ln, ln_ln) = parse_length(data.as_bytes(), tag_ln);
-                let offs = tag_ln + ln_ln;
-                let end: usize = (ln + (offs as u128)).try_into().unwrap();
-                value = &data.as_bytes()[offs..end];
-            } else {
-                panic!()
-            }
-        }
-        Some(val) => {
-            // Called with tag and value.
-            tag = tag_or_data
-                .downcast_ref::<PyLong>()?
-                .to_object(py)
-                .extract(py)?;
-            value = val.as_bytes();
-        }
-    }
-
-    return prepare_tlv_data_part2(tag, value)
-        .map_err(|_| ValueError::py_err(format!("Unsupported tag value: {}", tag)));
 }
 
 pub fn prepare_tlv_data_part2(tag: u16, value: &[u8]) -> Result<Vec<u8>, ()> {
