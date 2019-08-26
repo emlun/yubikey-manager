@@ -10,7 +10,7 @@ fn add_u128_leading_zeroes(bytes: &[u8], len: usize) -> [u8; 16] {
     padded
 }
 
-pub fn parse_tag(data: &[u8], offset: usize) -> (u16, u8) {
+pub fn parse_tag(data: &[u8], offset: usize) -> (u16, usize) {
     let t: u16 = data[offset].into();
 
     if t & 0x1f != 0x1f {
@@ -22,7 +22,7 @@ pub fn parse_tag(data: &[u8], offset: usize) -> (u16, u8) {
     }
 }
 
-pub fn parse_length(data: &[u8], offset: usize) -> (u128, u8) {
+pub fn parse_length(data: &[u8], offset: usize) -> (u128, usize) {
     let ln: u8 = data[offset].into();
     let offset = offset + 1;
 
@@ -31,7 +31,7 @@ pub fn parse_length(data: &[u8], offset: usize) -> (u128, u8) {
         let be_bytes: [u8; 16] =
             add_u128_leading_zeroes(&data[offset..], n_bytes.try_into().unwrap());
         let ln: u128 = u128::from_be_bytes(be_bytes);
-        (ln, n_bytes + 1)
+        (ln, (n_bytes + 1).try_into().unwrap())
     } else {
         (ln.into(), 1)
     }
