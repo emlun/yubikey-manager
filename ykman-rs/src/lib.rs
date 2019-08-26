@@ -83,5 +83,11 @@ fn ykman_rs(_py: Python, m: &PyModule) -> PyResult<()> {
         tlv::parse_length(data.as_bytes(), offset.unwrap_or(0))
     }
 
+    #[pyfn(m, "tlv_prepare_tlv_data_part2")]
+    fn py_tlv_prepare_tlv_data_part2(_py: Python, tag: u16, value: &PyBytes) -> PyResult<Vec<u8>> {
+        tlv::prepare_tlv_data_part2(tag, value.as_bytes())
+            .map_err(|_| ValueError::py_err(format!("Unsupported tag value: {}", tag)))
+    }
+
     Ok(())
 }

@@ -36,3 +36,40 @@ pub fn parse_length(data: &[u8], offset: usize) -> (u128, u8) {
         (ln.into(), 1)
     }
 }
+
+pub fn prepare_tlv_data_part2(tag: u16, value: &[u8]) -> Result<Vec<u8>, ()> {
+    let mut data: Vec<u8> = vec![];
+
+    if tag <= 0xff {
+        data.push(tag.try_into().unwrap());
+    } else {
+        let tag_1: u8 = (tag >> 8).try_into().unwrap();
+
+        if tag_1 & 0x1f != 0x1f {
+            return Err(());
+        }
+
+        let tag_2: u8 = (tag & 0xff).try_into().unwrap();
+        data.push(tag_1);
+        data.push(tag_2);
+    }
+
+    let length: usize = value.len();
+
+    if length < 0x80 {
+        data.push(length.try_into().unwrap());
+    } else if length < 0xff {
+        data.push(0x81);
+        data.push(length.try_into().unwrap());
+    } else {
+        data.push(0x82);
+        let msb: u8 = (length >> 8).try_into().unwrap();
+        let lsb: u8 = (length & 0xff).try_into().unwrap();
+        data.push(msb);
+        data.push(lsb);
+    }
+    for b in value {
+        data.push(*b);
+    }
+    Ok(data)
+}

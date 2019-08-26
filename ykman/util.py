@@ -255,28 +255,7 @@ def _prepare_tlv_data(*args):
     else:
         raise TypeError()
 
-    return _prepare_tlv_data_part2(tag, value)
-
-
-def _prepare_tlv_data_part2(tag, value):
-    data = bytearray([])
-    if tag <= 0xff:
-        data.append(tag)
-    else:
-        tag_1 = tag >> 8
-        if tag_1 > 0xff or tag_1 & 0x1f != 0x1f:
-            raise ValueError('Unsupported tag value')
-        tag_2 = tag & 0xff
-        data.extend([tag_1, tag_2])
-    length = len(value)
-    if length < 0x80:
-        data.append(length)
-    elif length < 0xff:
-        data.extend([0x81, length])
-    else:
-        data.extend([0x82, length >> 8, length & 0xff])
-    data += value
-    return data
+    return ykman_rs.tlv_prepare_tlv_data_part2(tag, value)
 
 
 class Tlv(bytes):
