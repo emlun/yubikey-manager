@@ -17,6 +17,7 @@ use pyo3::types::PyBytes;
 use pyo3::types::PyLong;
 use pyo3::types::PyString;
 use pyo3::types::PyTuple;
+use pyo3::FromPyObject;
 use pyo3::ToPyObject;
 
 use modhex::Modhex;
@@ -99,7 +100,7 @@ fn ykman_rs(_py: Python, m: &PyModule) -> PyResult<()> {
             None => {
                 if let Ok(data) = tag_or_data.downcast_ref::<PyLong>() {
                     // Called with tag only, blank value
-                    tag = data.to_object(py).extract(py)?;
+                    tag = u16::extract(data);
                     value = b"";
                 } else if let Ok(data) = tag_or_data.downcast_ref::<PyBytes>() {
                     // Called with binary TLV data
