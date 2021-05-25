@@ -52,6 +52,7 @@ from .openpgp import openpgp
 from .oath import oath
 from .piv import piv
 from .fido import fido
+from .fidoath import fidoath
 from .config import config
 from .aliases import apply_aliases
 from .apdu import apdu
