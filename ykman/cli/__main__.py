@@ -56,6 +56,7 @@ from .fidoath import fidoath
 from .config import config
 from .aliases import apply_aliases
 from .apdu import apdu
+from .vault import vault
 import click
 import ctypes
 import time
