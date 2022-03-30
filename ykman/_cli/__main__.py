@@ -49,6 +49,7 @@ from .config import config
 from .aliases import apply_aliases
 from .apdu import apdu
 from .script import run_script
+from .vault import vault
 
 import click
 import ctypes
