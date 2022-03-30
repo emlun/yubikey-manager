@@ -38,7 +38,9 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.keywrap import aes_key_unwrap_with_padding, aes_key_wrap_with_padding
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_der_public_key
-from fido2.client import Fido2Client
+from fido2.client import ClientError, Fido2Client
+from fido2.ctap import CtapError
+from fido2.ctap2.extensions import CredProtectExtension
 from fido2.pcsc import CtapPcscDevice
 from smartcard.Exceptions import NoCardException, CardConnectionException
 from time import sleep
@@ -126,6 +128,7 @@ def derive_authenticator_key(client: Fido2Client, user_data: dict, pin: Optional
         },
         pin=pin,
     ).get_response(0)
+
     authnr_private_key_bytes = assert_result.extension_results["hmacGetSecret"]["output1"]
     authnr_private_key_int = int.from_bytes(authnr_private_key_bytes, "big")
     authnr_private_key = ec.derive_private_key(authnr_private_key_int, CURVE())
@@ -148,7 +151,7 @@ def deserialize_public_key(serialized_pubkey: str):
     return load_der_public_key(deserialize_bytes(serialized_pubkey))
 
 
-def register_new_credential(client: Fido2Client, user_data: dict, name: Optional[str] = None, pin: Optional[str] = None):
+def register_new_credential(client: Fido2Client, user_data: dict, name: Optional[str] = None, pin: Optional[str] = None, require_uv: bool = False):
     user_handle = deserialize_bytes(user_data["user_handle"])
     user = {"id": user_handle, "name": serialize_bytes(user_handle)}
     hmac_salt = os.urandom(32)
@@ -165,7 +168,11 @@ def register_new_credential(client: Fido2Client, user_data: dict, name: Optional
                     "id": deserialize_bytes(cred["id"])
                 } for cred in user_data["fido_credentials"]
             ],
-            "extensions": {"hmacCreateSecret": True},
+            "extensions": {
+                "hmacCreateSecret": True,
+                "enforceCredentialProtectionPolicy": True,
+                "credentialProtectionPolicy": CredProtectExtension.POLICY.REQUIRED if require_uv else CredProtectExtension.POLICY.OPTIONAL_WITH_LIST,
+            },
         },
         pin=pin,
     )
@@ -175,7 +182,9 @@ def register_new_credential(client: Fido2Client, user_data: dict, name: Optional
         "rpId": RP_ID,
         "challenge": os.urandom(16),
         "allowCredentials": [{"type": "public-key", "id": cred_id}],
-        "extensions": {"hmacGetSecret": {"salt1": hmac_salt}},
+        "extensions": {
+            "hmacGetSecret": {"salt1": hmac_salt},
+        },
     }
     assert_result = client.get_assertion(
         get_assertion_args,
@@ -187,7 +196,7 @@ def register_new_credential(client: Fido2Client, user_data: dict, name: Optional
 
     if authnr_private_key_int == 0 or authnr_private_key_int >= CURVE_ORDER:
         click.echo("Generated bad wrapping key, retrying...")
-        return register_new_credential(client, user_data, name, pin)
+        return register_new_credential(client, user_data, name, pin, require_uv)
 
     else:
         authnr_private_key = ec.derive_private_key(authnr_private_key_int, CURVE())
@@ -197,6 +206,7 @@ def register_new_credential(client: Fido2Client, user_data: dict, name: Optional
             "name": name,
             "salt": serialize_bytes(hmac_salt),
             "public_key": serialize_public_key(authnr_private_key.public_key()),
+            "requires_uv": require_uv,
         }, authnr_private_key
 
 
@@ -298,9 +308,10 @@ def get_all_password_files():
 
 @vault.command()
 @click.option("--name", type=str, default=None, help="Nickname for the new credential.", show_default=True)
+@click.option("--require-uv", is_flag=True, default=False, help="Configure security key to require user verification (PIN).", show_default=True)
 @click_touch_option
 @click.pass_context
-def register(ctx, name, touch):
+def register(ctx, name, touch, require_uv):
     """
     Register a new FIDO security key to the vault.
 
@@ -328,7 +339,18 @@ def register(ctx, name, touch):
 
     if len(user_data["fido_credentials"]) == 0:
         client: Fido2Client = ctx.obj["client"]
-        credential, _ = register_new_credential(client, user_data, name=name)
+
+        try:
+            credential, _ = register_new_credential(client, user_data, name=name, require_uv=require_uv)
+
+        except ClientError as e:
+            if e.cause.code == CtapError.ERR.NO_CREDENTIALS:
+                info = client.ctap2.get_info()
+                print(info)
+                raise
+            else:
+                raise
+
         user_data["fido_credentials"].append(credential)
 
         click.echo("First security key successfully registered!")
@@ -351,7 +373,18 @@ def register(ctx, name, touch):
         conn = prompt_re_insert()
 
         client: Fido2Client = open_client(conn)
-        new_credential, new_authnr_key = register_new_credential(client, user_data, name=name)
+
+        try:
+            new_credential, new_authnr_key = register_new_credential(client, user_data, name=name, require_uv=require_uv)
+
+        except ClientError as e:
+            if e.cause.code == CtapError.ERR.NO_CREDENTIALS:
+                info = client.ctap2.get_info()
+                print(info)
+                raise
+            else:
+                raise
+
         user_data["fido_credentials"].append(new_credential)
 
         click.echo("Security key initialized, encrypting vault to new key...")
