@@ -420,8 +420,8 @@ def generate(ctx, password_path, length, symbols):
     password_key = _aes_keygen()
 
     password_contents = {
+        "content": serialize_bytes(aes_key_wrap_with_padding(password_key, password.encode('utf-8'))),
         "keys": {},
-        "content": serialize_bytes(aes_key_wrap_with_padding(password_key, password.encode('utf-8')))
     }
 
     user_data = load_user_data()
