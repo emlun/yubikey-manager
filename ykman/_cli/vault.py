@@ -73,11 +73,16 @@ VAULT_FILE_EXTENSION = ".vlt"
 
 # Handle user interaction
 class CliInteraction(UserInteraction):
+    def __init__(self):
+        self.pin = None
+
     def prompt_up(self):
         print("\nTouch your authenticator device now...\n")
 
     def request_pin(self, permissions, rd_id):
-        return getpass("Enter PIN: ")
+        if self.pin is None:
+            self.pin = getpass("Enter PIN: ")
+        return self.pin
 
     def request_uv(self, permissions, rd_id):
         print("User Verification required.")
@@ -145,6 +150,7 @@ def derive_authenticator_key(client: Fido2Client, user_data: dict):
             "rpId": RP_ID,
             "challenge": os.urandom(16),
             "allowCredentials": [{"type": "public-key", "id": cred_id}],
+            "userVerification": "required",
             "extensions": {
                 "hmacGetSecret": {"salt1": deserialize_bytes(chosen_cred["salt"])}
             },
@@ -195,6 +201,9 @@ def register_new_credential(
                 {"type": "public-key", "id": deserialize_bytes(cred["id"])}
                 for cred in user_data["fido_credentials"]
             ],
+            "authenticatorSelection": {
+                "userVerification": "required",
+            },
             "extensions": {
                 "hmacCreateSecret": True,
                 "enforceCredentialProtectionPolicy": True,
@@ -212,6 +221,7 @@ def register_new_credential(
         "rpId": RP_ID,
         "challenge": os.urandom(16),
         "allowCredentials": [{"type": "public-key", "id": cred_id}],
+        "userVerification": "required",
         "extensions": {"hmacGetSecret": {"salt1": hmac_salt}},
     }
     assert_result = client.get_assertion(get_assertion_args).get_response(0)
