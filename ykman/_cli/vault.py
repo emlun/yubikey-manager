@@ -331,6 +331,19 @@ def get_all_password_files():
 
 
 @vault.command()
+@click.pass_context
+def keys(ctx):
+    """
+    List security keys registered to the vault.
+    """
+
+    user_data = load_user_data()
+    click.echo("Registered security keys:")
+    for key in user_data["fido_credentials"]:
+        click.echo(f"""{key["name"] or "(unnamed)"} : {key["id"]}""")
+
+
+@vault.command()
 @click.option(
     "--name",
     type=str,
