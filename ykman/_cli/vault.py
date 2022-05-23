@@ -201,6 +201,8 @@ def register_new_credential(
         "attestationObject"
     ].auth_data.credential_data.credential_id
 
+    click.echo("Success!")
+
     get_assertion_args = {
         "rpId": RP_ID,
         "challenge": os.urandom(16),
@@ -610,12 +612,16 @@ def show(ctx, password_path):
     password_path = password_path.removesuffix(VAULT_FILE_EXTENSION)
     password_filepath = os.path.join(VAULT_DIR, password_path + VAULT_FILE_EXTENSION)
 
+    try:
+        with open(password_filepath) as f:
+            password_contents = json.load(f)
+    except FileNotFoundError as e:
+        click.echo(f"No such file in vault: {password_path}")
+        ctx.exit(1)
+
     user_data = load_user_data()
     client: Fido2Client = open_client(ctx.obj["conn"])
     authnr_key, cred_id = derive_authenticator_key(client, user_data)
-
-    with open(password_filepath) as f:
-        password_contents = json.load(f)
 
     exchange_pubkey_b64, salt_b64, password_key_enc_b64 = password_contents["keys"][
         cred_id
