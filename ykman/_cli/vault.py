@@ -532,7 +532,7 @@ def generate(ctx, password_path, length, symbols):
     with open(password_filepath, "wt") as f:
         json.dump(password_contents, f, indent=2)
 
-    click.echo("Wrote generated password to: " + password_path)
+    click.echo(f"Wrote generated password to: {password_path}")
 
     write_user_data(user_data)
 
