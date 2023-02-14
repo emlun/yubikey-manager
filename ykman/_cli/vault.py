@@ -45,10 +45,12 @@ from cryptography.hazmat.primitives.serialization import (
     PublicFormat,
     load_der_public_key,
 )
-from fido2.client import Fido2Client, UserInteraction
+from fido2.client import ClientError, Fido2Client, UserInteraction
+from fido2.ctap import CtapError
 from fido2.ctap2.extensions import CredProtectExtension
 from fido2.pcsc import CtapPcscDevice
 from getpass import getpass
+from hashlib import sha256
 from smartcard.Exceptions import NoCardException, CardConnectionException
 from time import sleep
 from typing import Optional
@@ -61,7 +63,7 @@ from .util import CliFail, click_prompt
 logger = logging.getLogger(__name__)
 
 
-RP_ID = "ykman+fido+vault://"
+RP_ID = "localhost"
 RP_STRUCTURE = {"id": RP_ID, "name": "YubiKey Manager FIDO-backed password vault"}
 
 USER_FILE_PATH = os.path.expanduser("~/.local/share/ykman/vault-user.json")
@@ -92,8 +94,8 @@ class CliInteraction(UserInteraction):
 def open_client(conn):
     return Fido2Client(
         conn,
-        "ykman+fido+vault://",
-        verify=lambda rp_id, origin: rp_id == origin and rp_id == "ykman+fido+vault://",
+        "localhost",
+        verify=lambda rp_id, origin: rp_id == origin and rp_id == "localhost",
         user_interaction=CliInteraction(),
     )
 
@@ -152,7 +154,9 @@ def derive_authenticator_key(client: Fido2Client, user_data: dict):
             "allowCredentials": [{"type": "public-key", "id": cred_id}],
             "userVerification": "required",
             "extensions": {
-                "hmacGetSecret": {"salt1": deserialize_bytes(chosen_cred["salt"])}
+                "hmacGetSecret": {
+                    "salt1": _prf_salt_to_hmac(deserialize_bytes(chosen_cred["prf_salt"])),
+                }
             },
         },
     ).get_response(0)
@@ -182,6 +186,18 @@ def deserialize_public_key(serialized_pubkey: str):
     return load_der_public_key(deserialize_bytes(serialized_pubkey))
 
 
+def _sha256(b):
+    h = sha256()
+    h.update(b)
+    d = h.digest()
+
+    return d
+
+
+def _prf_salt_to_hmac(salt: bytes) -> bytes:
+    return _sha256('WebAuthn PRF'.encode('utf-8') + bytes([0]) + salt)
+
+
 def register_new_credential(
     client: Fido2Client,
     user_data: dict,
@@ -189,7 +205,7 @@ def register_new_credential(
 ):
     user_handle = deserialize_bytes(user_data["user_handle"])
     user = {"id": user_handle, "name": serialize_bytes(user_handle)}
-    hmac_salt = os.urandom(32)
+    prf_salt = os.urandom(32)
 
     make_cred_result = client.make_credential(
         {
@@ -222,7 +238,7 @@ def register_new_credential(
         "challenge": os.urandom(16),
         "allowCredentials": [{"type": "public-key", "id": cred_id}],
         "userVerification": "required",
-        "extensions": {"hmacGetSecret": {"salt1": hmac_salt}},
+        "extensions": {"hmacGetSecret": {"salt1": _prf_salt_to_hmac(prf_salt)}},
     }
     assert_result = client.get_assertion(get_assertion_args).get_response(0)
 
@@ -241,7 +257,7 @@ def register_new_credential(
         return {
             "id": serialize_bytes(cred_id),
             "name": name,
-            "salt": serialize_bytes(hmac_salt),
+            "prf_salt": serialize_bytes(prf_salt),
             "public_key": serialize_public_key(authnr_private_key.public_key()),
         }, authnr_private_key
 
@@ -395,7 +411,18 @@ def register(ctx, name):
 
     if len(user_data["fido_credentials"]) == 0:
         client: Fido2Client = ctx.obj["client"]
-        credential, _ = register_new_credential(client, user_data, name=name)
+
+        try:
+            credential, _ = register_new_credential(client, user_data, name=name)
+
+        except ClientError as e:
+            if e.cause.code == CtapError.ERR.NO_CREDENTIALS:
+                info = client.ctap2.get_info()
+                print(info)
+                raise
+            else:
+                raise
+
         user_data["fido_credentials"].append(credential)
 
         click.echo("First security key successfully registered!")
@@ -420,9 +447,19 @@ def register(ctx, name):
         conn = prompt_re_insert()
 
         client: Fido2Client = open_client(conn)
-        new_credential, new_authnr_key = register_new_credential(
-            client, user_data, name=name
-        )
+        try:
+            new_credential, new_authnr_key = register_new_credential(
+                client, user_data, name=name
+            )
+
+        except ClientError as e:
+            if e.cause.code == CtapError.ERR.NO_CREDENTIALS:
+                info = client.ctap2.get_info()
+                print(info)
+                raise
+            else:
+                raise
+
         user_data["fido_credentials"].append(new_credential)
 
         click.echo("Security key initialized, encrypting vault to new key...")
@@ -630,7 +667,7 @@ def show(ctx, password_path):
     try:
         with open(password_filepath) as f:
             password_contents = json.load(f)
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         click.echo(f"No such file in vault: {password_path}")
         ctx.exit(1)
 
