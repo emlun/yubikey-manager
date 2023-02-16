@@ -35,6 +35,7 @@ import sys
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.keywrap import (
     aes_key_unwrap,
@@ -120,7 +121,7 @@ def vault(ctx):
 
 
 def _aes_keygen():
-    return os.urandom(16)
+    return AESGCM.generate_key(bit_length=128), os.urandom(16)
 
 
 def choose_credential(client: Fido2Client, user_data: dict):
@@ -557,12 +558,14 @@ def generate(ctx, password_path, length, symbols):
 
     password_path = password_path.removesuffix(VAULT_FILE_EXTENSION)
     password_filepath = os.path.join(VAULT_DIR, password_path + VAULT_FILE_EXTENSION)
-    password_key = _aes_keygen()
+    password_key, iv = _aes_keygen()
+    aesgcm = AESGCM(password_key)
 
     password_contents = {
         "content": serialize_bytes(
-            aes_key_wrap(password_key, password.encode("utf-8"))
+            aesgcm.encrypt(iv, password.encode("utf-8"), None)
         ),
+        "iv": serialize_bytes(iv),
         "keys": {},
     }
 
@@ -690,9 +693,14 @@ def show(ctx, password_path):
     password_key = aes_key_unwrap(
         wrapping_key, deserialize_bytes(password_key_enc_b64)
     )
-    password = aes_key_unwrap(
-        password_key, deserialize_bytes(password_contents["content"])
-    ).decode("utf-8")
+    aesgcm = AESGCM(password_key)
+
+    password_utf8 = aesgcm.decrypt(
+        deserialize_bytes(password_contents["iv"]),
+        deserialize_bytes(password_contents["content"]),
+        None
+    )
+    password = password_utf8.decode("utf-8")
 
     click.echo(password)
 
