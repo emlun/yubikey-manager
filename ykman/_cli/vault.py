@@ -37,8 +37,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.keywrap import (
-    aes_key_unwrap_with_padding,
-    aes_key_wrap_with_padding,
+    aes_key_unwrap,
+    aes_key_wrap,
 )
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
@@ -486,14 +486,14 @@ def register(ctx, name):
                 old_salt,
             )
 
-            password_key = aes_key_unwrap_with_padding(
+            password_key = aes_key_unwrap(
                 old_wrapping_key, deserialize_bytes(password_key_enc_b64)
             )
 
             new_wrapping_key, new_exchange_pubkey, new_salt = generate_wrapping_key(
                 new_authnr_key.public_key(), password_path
             )
-            new_password_enc = aes_key_wrap_with_padding(new_wrapping_key, password_key)
+            new_password_enc = aes_key_wrap(new_wrapping_key, password_key)
 
             password_contents["keys"][new_credential["id"]] = (
                 serialize_public_key(new_exchange_pubkey),
@@ -561,7 +561,7 @@ def generate(ctx, password_path, length, symbols):
 
     password_contents = {
         "content": serialize_bytes(
-            aes_key_wrap_with_padding(password_key, password.encode("utf-8"))
+            aes_key_wrap(password_key, password.encode("utf-8"))
         ),
         "keys": {},
     }
@@ -573,7 +573,7 @@ def generate(ctx, password_path, length, symbols):
         new_wrapping_key, new_exchange_pubkey, new_salt = generate_wrapping_key(
             authnr_pubkey, password_path
         )
-        new_password_enc = aes_key_wrap_with_padding(new_wrapping_key, password_key)
+        new_password_enc = aes_key_wrap(new_wrapping_key, password_key)
 
         password_contents["keys"][cred["id"]] = (
             serialize_public_key(new_exchange_pubkey),
@@ -687,10 +687,10 @@ def show(ctx, password_path):
         salt,
     )
 
-    password_key = aes_key_unwrap_with_padding(
+    password_key = aes_key_unwrap(
         wrapping_key, deserialize_bytes(password_key_enc_b64)
     )
-    password = aes_key_unwrap_with_padding(
+    password = aes_key_unwrap(
         password_key, deserialize_bytes(password_contents["content"])
     ).decode("utf-8")
 
