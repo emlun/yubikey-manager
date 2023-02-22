@@ -95,8 +95,8 @@ class CliInteraction(UserInteraction):
 def open_client(conn):
     return Fido2Client(
         conn,
-        "localhost",
-        verify=lambda rp_id, origin: rp_id == origin and rp_id == "localhost",
+        RP_ID,
+        verify=lambda rp_id, origin: rp_id == origin and rp_id == RP_ID,
         user_interaction=CliInteraction(),
     )
 
