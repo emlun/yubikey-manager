@@ -711,3 +711,24 @@ def list():
     Show password files in the vault.
     """
     os.execlp("tree", "tree", VAULT_DIR)
+
+
+@vault.command()
+def export():
+    """
+    Export vault for import into web app.
+    """
+
+    output = {
+        'v': 0,
+        'user': load_user_data(),
+        'files': {
+            password_filepath
+            .removeprefix(VAULT_DIR)
+            .removeprefix("/")
+            .removesuffix(VAULT_FILE_EXTENSION):
+            json.load(open(password_filepath))
+            for password_filepath in get_all_password_files()
+        }
+    }
+    click.echo(json.dumps(output))
