@@ -473,13 +473,9 @@ def register(ctx, name):
                 password_filepath, start=VAULT_DIR
             ).removesuffix(VAULT_FILE_EXTENSION)
 
-            (
-                old_exchange_pubkey_b64,
-                old_salt_b64,
-                password_key_enc_b64,
-            ) = password_contents["keys"][old_cred_id]
-            old_exchange_pubkey = deserialize_public_key(old_exchange_pubkey_b64)
-            old_salt = deserialize_bytes(old_salt_b64)
+            old_password_key = password_contents["keys"][old_cred_id]
+            old_exchange_pubkey = deserialize_public_key(old_password_key['exchange_pubkey'])
+            old_salt = deserialize_bytes(old_password_key['hkdf_salt'])
             old_wrapping_key = derive_wrapping_key(
                 old_authnr_key,
                 old_exchange_pubkey,
@@ -488,7 +484,7 @@ def register(ctx, name):
             )
 
             password_key = aes_key_unwrap(
-                old_wrapping_key, deserialize_bytes(password_key_enc_b64)
+                old_wrapping_key, deserialize_bytes(old_password_key['wrapping_key'])
             )
 
             new_wrapping_key, new_exchange_pubkey, new_salt = generate_wrapping_key(
@@ -496,11 +492,11 @@ def register(ctx, name):
             )
             new_password_enc = aes_key_wrap(new_wrapping_key, password_key)
 
-            password_contents["keys"][new_credential["id"]] = (
-                serialize_public_key(new_exchange_pubkey),
-                serialize_bytes(new_salt),
-                serialize_bytes(new_password_enc),
-            )
+            password_contents["keys"][new_credential["id"]] = {
+                'exchange_pubkey': serialize_public_key(new_exchange_pubkey),
+                'hkdf_salt': serialize_bytes(new_salt),
+                'wrapping_key': serialize_bytes(new_password_enc),
+            }
 
             with open(password_filepath, "wt") as f:
                 json.dump(password_contents, f, indent=2)
@@ -578,11 +574,11 @@ def generate(ctx, password_path, length, symbols):
         )
         new_password_enc = aes_key_wrap(new_wrapping_key, password_key)
 
-        password_contents["keys"][cred["id"]] = (
-            serialize_public_key(new_exchange_pubkey),
-            serialize_bytes(new_salt),
-            serialize_bytes(new_password_enc),
-        )
+        password_contents["keys"][cred["id"]] = {
+            'exchange_pubkey': serialize_public_key(new_exchange_pubkey),
+            'hkdf_salt': serialize_bytes(new_salt),
+            'wrapping_key': serialize_bytes(new_password_enc),
+        }
 
     password_dirname = os.path.dirname(password_filepath)
     os.makedirs(password_dirname, exist_ok=True)
@@ -678,11 +674,9 @@ def show(ctx, password_path):
     client: Fido2Client = open_client(ctx.obj["conn"])
     authnr_key, cred_id = derive_authenticator_key(client, user_data)
 
-    exchange_pubkey_b64, salt_b64, password_key_enc_b64 = password_contents["keys"][
-        cred_id
-    ]
-    exchange_pubkey = deserialize_public_key(exchange_pubkey_b64)
-    salt = deserialize_bytes(salt_b64)
+    password_key = password_contents["keys"][cred_id]
+    exchange_pubkey = deserialize_public_key(password_key['exchange_pubkey'])
+    salt = deserialize_bytes(password_key['hkdf_salt'])
     wrapping_key = derive_wrapping_key(
         authnr_key,
         exchange_pubkey,
@@ -691,7 +685,7 @@ def show(ctx, password_path):
     )
 
     password_key = aes_key_unwrap(
-        wrapping_key, deserialize_bytes(password_key_enc_b64)
+        wrapping_key, deserialize_bytes(password_key['wrapping_key'])
     )
     aesgcm = AESGCM(password_key)
 
