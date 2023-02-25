@@ -46,6 +46,7 @@ from cryptography.hazmat.primitives.serialization import (
     load_der_public_key,
 )
 from fido2.client import Fido2Client, UserInteraction
+from fido2.ctap2.extensions import CredProtectExtension
 from fido2.pcsc import CtapPcscDevice
 from getpass import getpass
 from smartcard.Exceptions import NoCardException, CardConnectionException
@@ -194,7 +195,11 @@ def register_new_credential(
                 {"type": "public-key", "id": deserialize_bytes(cred["id"])}
                 for cred in user_data["fido_credentials"]
             ],
-            "extensions": {"hmacCreateSecret": True},
+            "extensions": {
+                "hmacCreateSecret": True,
+                "enforceCredentialProtectionPolicy": True,
+                "credentialProtectionPolicy": CredProtectExtension.POLICY.OPTIONAL_WITH_LIST,
+            },
         },
     )
     cred_id = make_cred_result[
