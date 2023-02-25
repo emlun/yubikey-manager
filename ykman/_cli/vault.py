@@ -364,6 +364,22 @@ def get_all_password_files():
                 yield os.path.join(dirpath, filename)
 
 
+def encrypt_password_key(
+        password_path: str,
+        password_key: bytes,
+        authnr_key: ec.EllipticCurvePublicKey,
+) -> dict[str, bytes]:
+    new_wrapping_key, new_exchange_pubkey, new_salt = generate_wrapping_key(
+        authnr_key, password_path)
+    wrapped_password_key = aes_key_wrap(new_wrapping_key, password_key)
+
+    return {
+        'exchange_pubkey': serialize_public_key(new_exchange_pubkey),
+        'hkdf_salt': serialize_bytes(new_salt),
+        'wrapping_key': serialize_bytes(wrapped_password_key),
+    }
+
+
 @vault.command()
 @click.pass_context
 def keys(ctx):
@@ -487,16 +503,11 @@ def register(ctx, name):
                 old_wrapping_key, deserialize_bytes(old_password_key['wrapping_key'])
             )
 
-            new_wrapping_key, new_exchange_pubkey, new_salt = generate_wrapping_key(
-                new_authnr_key.public_key(), password_path
+            password_contents["keys"][new_credential["id"]] = encrypt_password_key(
+                password_path,
+                password_key,
+                new_authnr_key.public_key(),
             )
-            new_password_enc = aes_key_wrap(new_wrapping_key, password_key)
-
-            password_contents["keys"][new_credential["id"]] = {
-                'exchange_pubkey': serialize_public_key(new_exchange_pubkey),
-                'hkdf_salt': serialize_bytes(new_salt),
-                'wrapping_key': serialize_bytes(new_password_enc),
-            }
 
             with open(password_filepath, "wt") as f:
                 json.dump(password_contents, f, indent=2)
@@ -569,16 +580,8 @@ def generate(ctx, password_path, length, symbols):
 
     for cred in user_data["fido_credentials"]:
         authnr_pubkey = deserialize_public_key(cred["public_key"])
-        new_wrapping_key, new_exchange_pubkey, new_salt = generate_wrapping_key(
-            authnr_pubkey, password_path
-        )
-        new_password_enc = aes_key_wrap(new_wrapping_key, password_key)
-
-        password_contents["keys"][cred["id"]] = {
-            'exchange_pubkey': serialize_public_key(new_exchange_pubkey),
-            'hkdf_salt': serialize_bytes(new_salt),
-            'wrapping_key': serialize_bytes(new_password_enc),
-        }
+        password_contents["keys"][cred["id"]] = encrypt_password_key(
+            password_path, password_key, authnr_pubkey)
 
     password_dirname = os.path.dirname(password_filepath)
     os.makedirs(password_dirname, exist_ok=True)
