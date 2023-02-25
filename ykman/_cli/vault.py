@@ -364,11 +364,30 @@ def get_all_password_files():
                 yield os.path.join(dirpath, filename)
 
 
+def decrypt_password_key(
+        password_path: str,
+        authnr_key: ec.EllipticCurvePrivateKey,
+        password_credential_key: dict[str, str],
+) -> bytes:
+    exchange_pubkey = deserialize_public_key(password_credential_key['exchange_pubkey'])
+    salt = deserialize_bytes(password_credential_key['hkdf_salt'])
+    wrapping_key = derive_wrapping_key(
+        authnr_key,
+        exchange_pubkey,
+        password_path,
+        salt,
+    )
+
+    return aes_key_unwrap(
+        wrapping_key, deserialize_bytes(password_credential_key['wrapping_key'])
+    )
+
+
 def encrypt_password_key(
         password_path: str,
         password_key: bytes,
         authnr_key: ec.EllipticCurvePublicKey,
-) -> dict[str, bytes]:
+) -> dict[str, str]:
     new_wrapping_key, new_exchange_pubkey, new_salt = generate_wrapping_key(
         authnr_key, password_path)
     wrapped_password_key = aes_key_wrap(new_wrapping_key, password_key)
@@ -489,18 +508,10 @@ def register(ctx, name):
                 password_filepath, start=VAULT_DIR
             ).removesuffix(VAULT_FILE_EXTENSION)
 
-            old_password_key = password_contents["keys"][old_cred_id]
-            old_exchange_pubkey = deserialize_public_key(old_password_key['exchange_pubkey'])
-            old_salt = deserialize_bytes(old_password_key['hkdf_salt'])
-            old_wrapping_key = derive_wrapping_key(
-                old_authnr_key,
-                old_exchange_pubkey,
+            password_key = decrypt_password_key(
                 password_path,
-                old_salt,
-            )
-
-            password_key = aes_key_unwrap(
-                old_wrapping_key, deserialize_bytes(old_password_key['wrapping_key'])
+                old_authnr_key,
+                password_contents["keys"][old_cred_id],
             )
 
             password_contents["keys"][new_credential["id"]] = encrypt_password_key(
@@ -677,18 +688,10 @@ def show(ctx, password_path):
     client: Fido2Client = open_client(ctx.obj["conn"])
     authnr_key, cred_id = derive_authenticator_key(client, user_data)
 
-    password_key = password_contents["keys"][cred_id]
-    exchange_pubkey = deserialize_public_key(password_key['exchange_pubkey'])
-    salt = deserialize_bytes(password_key['hkdf_salt'])
-    wrapping_key = derive_wrapping_key(
-        authnr_key,
-        exchange_pubkey,
+    password_key = decrypt_password_key(
         password_path,
-        salt,
-    )
-
-    password_key = aes_key_unwrap(
-        wrapping_key, deserialize_bytes(password_key['wrapping_key'])
+        authnr_key,
+        password_contents["keys"][cred_id],
     )
     aesgcm = AESGCM(password_key)
 
