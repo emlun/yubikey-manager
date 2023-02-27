@@ -64,8 +64,7 @@ from .util import CliFail, click_prompt
 logger = logging.getLogger(__name__)
 
 
-RP_ID = "localhost"
-RP_STRUCTURE = {"id": RP_ID, "name": "YubiKey Manager FIDO-backed password vault"}
+DEFAULT_RP_ID = "localhost"
 
 USER_FILE_PATH = os.path.expanduser("~/.local/share/ykman/vault-user.json")
 VAULT_DIR = os.path.expanduser("~/.local/share/ykman/vault")
@@ -92,13 +91,20 @@ class CliInteraction(UserInteraction):
         return True
 
 
-def open_client(conn):
+def open_client(conn, rp_id):
     return Fido2Client(
         conn,
-        RP_ID,
-        verify=lambda rp_id, origin: rp_id == origin and rp_id == RP_ID,
+        rp_id,
+        verify=lambda req_rp_id, origin: req_rp_id == origin and req_rp_id == rp_id,
         user_interaction=CliInteraction(),
     )
+
+
+def rp_structure(rp_id: str) -> dict[str, str]:
+    return {
+        "id": rp_id,
+        "name": "YubiKey Manager FIDO-backed password vault",
+    }
 
 
 @fido.group()
@@ -117,8 +123,6 @@ def vault(ctx):
             """This security key does not support the CTAP2 "hmac-secret" extension."""
         )
 
-    ctx.obj["client"] = open_client(ctx.obj["conn"])
-
 
 def _aes_keygen():
     return AESGCM.generate_key(bit_length=128), os.urandom(16)
@@ -127,7 +131,7 @@ def _aes_keygen():
 def choose_credential(client: Fido2Client, user_data: dict):
     choose_cred_result = client.get_assertion(
         {
-            "rpId": RP_ID,
+            "rpId": user_data["rp_id"],
             "challenge": os.urandom(16),
             "userVerification": "discouraged",
             "allowCredentials": [
@@ -150,7 +154,7 @@ def derive_authenticator_key(client: Fido2Client, user_data: dict):
 
     assert_result = client.get_assertion(
         {
-            "rpId": RP_ID,
+            "rpId": user_data["rp_id"],
             "challenge": os.urandom(16),
             "allowCredentials": [{"type": "public-key", "id": cred_id}],
             "userVerification": "required",
@@ -210,7 +214,7 @@ def register_new_credential(
 
     make_cred_result = client.make_credential(
         {
-            "rp": RP_STRUCTURE,
+            "rp": rp_structure(user_data["rp_id"]),
             "user": user,
             "challenge": os.urandom(16),
             "pubKeyCredParams": [{"type": "public-key", "alg": -7}],
@@ -235,7 +239,7 @@ def register_new_credential(
     click.echo("Success!")
 
     get_assertion_args = {
-        "rpId": RP_ID,
+        "rpId": user_data["rp_id"],
         "challenge": os.urandom(16),
         "allowCredentials": [{"type": "public-key", "id": cred_id}],
         "userVerification": "required",
@@ -437,6 +441,7 @@ def register(ctx, name):
             user_handle = os.urandom(32)
             user_data = {
                 "v": 0,
+                "rp_id": DEFAULT_RP_ID,
                 "user_handle": serialize_bytes(user_handle),
                 "fido_credentials": [],
             }
@@ -446,7 +451,7 @@ def register(ctx, name):
         raise CliFail("Failed to read user data file.")
 
     if len(user_data["fido_credentials"]) == 0:
-        client: Fido2Client = ctx.obj["client"]
+        client: Fido2Client = open_client(conn, user_data["rp_id"])
 
         try:
             credential, _ = register_new_credential(client, user_data, name=name)
@@ -472,7 +477,7 @@ def register(ctx, name):
             "Remove the security key from the NFC reader and place one you have already registered...",
         )
         conn = prompt_re_insert()
-        client: Fido2Client = open_client(conn)
+        client: Fido2Client = open_client(conn, user_data["rp_id"])
         old_authnr_key, old_cred_id = derive_authenticator_key(client, user_data)
 
         prompt_re_insert = get_prompt_reinsert(
@@ -482,7 +487,7 @@ def register(ctx, name):
         )
         conn = prompt_re_insert()
 
-        client: Fido2Client = open_client(conn)
+        client: Fido2Client = open_client(conn, user_data["rp_id"])
         try:
             new_credential, new_authnr_key = register_new_credential(
                 client, user_data, name=name
@@ -625,7 +630,7 @@ def deregister(ctx, identify):
         ctx.fail("Cannot deregister the last security key.")
 
     if identify:
-        client: Fido2Client = open_client(ctx.obj["conn"])
+        client: Fido2Client = open_client(ctx.obj["conn"], user_data["rp_id"])
         cred_id = serialize_bytes(choose_credential(client, user_data))
     else:
         click.echo("Registered security keys:")
@@ -685,7 +690,7 @@ def show(ctx, password_path):
         ctx.exit(1)
 
     user_data = load_user_data()
-    client: Fido2Client = open_client(ctx.obj["conn"])
+    client: Fido2Client = open_client(ctx.obj["conn"], user_data["rp_id"])
     authnr_key, cred_id = derive_authenticator_key(client, user_data)
 
     password_key = decrypt_password_key(
