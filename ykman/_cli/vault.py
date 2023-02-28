@@ -263,13 +263,13 @@ def register_new_credential(
             "id": serialize_bytes(cred_id),
             "name": name,
             "prf_salt": serialize_bytes(prf_salt),
-            "public_key": serialize_public_key(authnr_private_key.public_key()),
+            "ecdh_pubkey": serialize_public_key(authnr_private_key.public_key()),
         }, authnr_private_key
 
 
 def derive_wrapping_key(
-    exchange_prikey: ec.EllipticCurvePrivateKey,
-    exchange_pubkey: ec.EllipticCurvePublicKey,
+    ecdh_prikey: ec.EllipticCurvePrivateKey,
+    ecdh_pubkey: ec.EllipticCurvePublicKey,
     password_path: str,
     salt: bytes,
 ):
@@ -280,17 +280,17 @@ def derive_wrapping_key(
         info=password_path.encode("utf-8"),
     )
     authnr_password_key = hkdf.derive(
-        exchange_prikey.exchange(ec.ECDH(), exchange_pubkey)
+        ecdh_prikey.exchange(ec.ECDH(), ecdh_pubkey)
     )
     return authnr_password_key
 
 
 def generate_wrapping_key(authnr_pubkey: ec.EllipticCurvePublicKey, password_path: str):
-    exchange_key = ec.generate_private_key(CURVE())
+    ecdh_key = ec.generate_private_key(CURVE())
     salt = os.urandom(16)
     return (
-        derive_wrapping_key(exchange_key, authnr_pubkey, password_path, salt),
-        exchange_key.public_key(),
+        derive_wrapping_key(ecdh_key, authnr_pubkey, password_path, salt),
+        ecdh_key.public_key(),
         salt,
     )
 
@@ -373,11 +373,11 @@ def decrypt_password_key(
         authnr_key: ec.EllipticCurvePrivateKey,
         password_credential_key: dict[str, str],
 ) -> bytes:
-    exchange_pubkey = deserialize_public_key(password_credential_key['exchange_pubkey'])
+    ecdh_pubkey = deserialize_public_key(password_credential_key['ecdh_pubkey'])
     salt = deserialize_bytes(password_credential_key['hkdf_salt'])
     wrapping_key = derive_wrapping_key(
         authnr_key,
-        exchange_pubkey,
+        ecdh_pubkey,
         password_path,
         salt,
     )
@@ -392,12 +392,12 @@ def encrypt_password_key(
         password_key: bytes,
         authnr_key: ec.EllipticCurvePublicKey,
 ) -> dict[str, str]:
-    new_wrapping_key, new_exchange_pubkey, new_salt = generate_wrapping_key(
+    new_wrapping_key, new_ecdh_pubkey, new_salt = generate_wrapping_key(
         authnr_key, password_path)
     wrapped_password_key = aes_key_wrap(new_wrapping_key, password_key)
 
     return {
-        'exchange_pubkey': serialize_public_key(new_exchange_pubkey),
+        'ecdh_pubkey': serialize_public_key(new_ecdh_pubkey),
         'hkdf_salt': serialize_bytes(new_salt),
         'wrapped_key': serialize_bytes(wrapped_password_key),
     }
@@ -595,7 +595,7 @@ def generate(ctx, password_path, length, symbols):
     user_data = load_user_data()
 
     for cred in user_data["fido_credentials"]:
-        authnr_pubkey = deserialize_public_key(cred["public_key"])
+        authnr_pubkey = deserialize_public_key(cred["ecdh_pubkey"])
         password_contents["keys"][cred["id"]] = encrypt_password_key(
             password_path, password_key, authnr_pubkey)
 
