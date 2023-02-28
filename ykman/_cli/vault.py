@@ -383,7 +383,7 @@ def decrypt_password_key(
     )
 
     return aes_key_unwrap(
-        wrapping_key, deserialize_bytes(password_credential_key['wrapping_key'])
+        wrapping_key, deserialize_bytes(password_credential_key['wrapped_key'])
     )
 
 
@@ -399,7 +399,7 @@ def encrypt_password_key(
     return {
         'exchange_pubkey': serialize_public_key(new_exchange_pubkey),
         'hkdf_salt': serialize_bytes(new_salt),
-        'wrapping_key': serialize_bytes(wrapped_password_key),
+        'wrapped_key': serialize_bytes(wrapped_password_key),
     }
 
 
