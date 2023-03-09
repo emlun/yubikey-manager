@@ -323,20 +323,16 @@ def get_prompt_reinsert(conn, msg: str, nfc_msg: str):
 
     else:  # USB
         n_keys = len(list_ctap_devices())
-        if n_keys > 1:
-            raise CliFail("Only one security key may be connected!")
 
         def prompt_re_insert():
             click.echo(msg)
 
-            removed = False
+            ignore_fingerprints = set(dev.fingerprint for dev in list_ctap_devices())
             while True:
                 sleep(0.5)
-                keys = list_ctap_devices()
-                if not keys:
-                    removed = True
-                if removed and len(keys) == 1:
-                    return keys[0].open_connection(FidoConnection)
+                for dev in list_ctap_devices():
+                    if dev.fingerprint not in ignore_fingerprints:
+                        return dev.open_connection(FidoConnection)
 
     return prompt_re_insert
 
@@ -471,18 +467,13 @@ def register(ctx, name):
     else:
         click.echo("")
 
-        prompt_re_insert = get_prompt_reinsert(
-            conn,
-            "Unplug all security keys, then plug in a security key you have already registered...",
-            "Remove the security key from the NFC reader and place one you have already registered...",
-        )
-        conn = prompt_re_insert()
+        click.echo("Authenticate with a security key you have already registered...")
         client: Fido2Client = open_client(conn, user_data["rp_id"])
         old_authnr_key, old_cred_id = derive_authenticator_key(client, user_data)
 
         prompt_re_insert = get_prompt_reinsert(
             conn,
-            "Unplug the security key, then plug in the new one to register...",
+            "Plug in the new security key to register...",
             "Remove the security key from the NFC reader and place the new one to register...",
         )
         conn = prompt_re_insert()
